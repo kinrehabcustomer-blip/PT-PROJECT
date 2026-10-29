@@ -10,15 +10,20 @@
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "line:check": "tsx scripts/line-check.ts"
+    "line:check": "tsx scripts/line-check.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts"
   },
   "dependencies": {
     "next": "16.4.3",
+    "pg": "^8.23.1",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
+    "@electric-sql/pglite-socket": "^0.2.16",
     "@types/node": "^22.15.30",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.7",
     "eslint": "^9.30.0",

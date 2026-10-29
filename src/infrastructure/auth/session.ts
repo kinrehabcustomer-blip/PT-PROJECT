@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import type { Actor, User } from "@/domain/models";
-import { loadData } from "@/infrastructure/repositories/store";
+import { findUser } from "@/infrastructure/repositories/store";
 import { signToken, verifyToken } from "@/infrastructure/auth/crypto";
 
 export const SESSION_COOKIE = "pt_session";
@@ -26,7 +26,7 @@ export async function currentUser(): Promise<User | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const payload = token ? verifyToken(token) : null;
   if (!payload) return null;
-  const user = (await loadData()).users.find((u) => u.id === payload.uid);
+  const user = await findUser(payload.uid);
   return user?.active ? user : null;
 }
 

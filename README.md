@@ -30,18 +30,19 @@ npm test
 - `src/presentation` — components แยกหมวด และ state กลาง
 - `src/app` — หน้า ภาพรวม/นัดหมาย, คอร์สการรักษา, แจ้งเตือน
 
-## Deploy บน Vercel
+## Deploy บน Vercel + Neon (Postgres)
 
-Vercel เขียนไฟล์ไม่ได้ ระบบจึงเก็บข้อมูลใน **Upstash Redis** เมื่อมีค่า `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (ถ้าไม่ตั้งและรันบน Vercel ระบบจะแจ้ง error ชัดเจน ไม่เงียบหาย)
+Vercel เขียนไฟล์ไม่ได้ ระบบจึงเก็บข้อมูลใน **Neon Postgres** เมื่อมีค่า `DATABASE_URL` (ลำดับที่ใช้: Postgres → Upstash Redis → ไฟล์ในเครื่อง ถ้ารันบน Vercel แล้วไม่ได้ตั้งค่า ระบบจะแจ้ง error ชัดเจน ไม่เงียบหาย)
 
-1. Vercel → Project → **Storage** → Create → **Upstash Redis** (Marketplace) แล้วเชื่อมกับโปรเจกต์ ตัวแปร `KV_REST_API_URL` / `KV_REST_API_TOKEN` (หรือ `UPSTASH_REDIS_*`) จะถูกเพิ่มให้เอง
-2. Settings → **Environment Variables** ใส่: `AUTH_SECRET`, `ADMIN_PASSWORD`, `CRON_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LINE_ADMIN_USER_ID`
-3. **Redeploy** (ตัวแปรใหม่ไม่มีผลกับ deployment เก่า)
+1. สร้างโปรเจกต์ที่ [neon.tech](https://neon.tech) (เลือก region ใกล้ไทย เช่น Singapore) แล้วคัดลอก **connection string** แบบ **Pooled connection** (host มี `-pooler`)
+2. สร้างตาราง: ใส่ `DATABASE_URL=...` ใน `.env.local` แล้วรัน `npm run db:migrate` (สร้างตารางครบ + ค่าตั้งต้น ฐานข้อมูลว่างพร้อมใส่ข้อมูลจริง) หรือใช้ `npm run db:migrate -- --demo` ถ้าต้องการข้อมูลตัวอย่าง
+   - หรือเปิดไฟล์ [db/schema.sql](db/schema.sql) วางใน Neon Console → **SQL Editor** แล้วรัน จากนั้นรันบรรทัดนี้ต่อเพื่อให้ระบบเริ่มต้นด้วยฐานข้อมูลว่าง: `INSERT INTO settings (id) VALUES (1) ON CONFLICT DO NOTHING;`
+3. Vercel → Settings → **Environment Variables** ใส่: `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_PASSWORD`, `CRON_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LINE_ADMIN_USER_ID` แล้ว **Redeploy**
 4. เปิดเว็บ ล็อกอิน `admin` ด้วย `ADMIN_PASSWORD` ครั้งแรก แล้วสร้างบัญชีอื่นที่หน้า "ผู้ใช้และทีม"
 5. LINE Developers Console → Webhook URL = `https://<โดเมน>/api/line/webhook` → Verify (หรือ `npm run line:check -- https://<โดเมน>`)
 6. ตัวส่งตามเวลา: แผนฟรี (Hobby) ของ Vercel ตั้ง cron ได้วันละครั้ง จึงใช้ [cron-job.org](https://cron-job.org) (ฟรี) เรียก `GET https://<โดเมน>/api/notifications/dispatch` ทุก 5 นาที พร้อมหัว `Authorization: Bearer <CRON_SECRET>`
 
-ข้อมูลทั้งหมดอยู่ใน Redis key เดียว (`pt:db`) ที่เขียนแบบ compare-and-set จึงไม่ทับกันเมื่อมีหลายคนใช้พร้อมกัน แผนฟรีของ Upstash จำกัดขนาดคำขอ ระบบจึงลบประวัติแจ้งเตือนที่เสร็จแล้วเก่ากว่า 90 วันให้อัตโนมัติ (ประวัติการแก้ไขคอร์สไม่ถูกลบ) ถ้าข้อมูลโตเกินนี้ควรย้ายไปฐานข้อมูลเต็มรูปแบบ
+ตาราง: `patients`, `therapists`, `courses`, `course_history`, `appointments`, `notifications`, `course_audit`, `users`, `credentials` (รหัสผ่านแบบ hash แยกจาก users), `link_codes`, `settings`, `rate_limits`, `locks` การเขียนทุกครั้งอยู่ใน transaction เดียวพร้อม advisory lock จึงไม่ทับกันเมื่อมีหลายคนใช้พร้อมกัน และเขียนเฉพาะแถวที่เปลี่ยน ระบบลบประวัติแจ้งเตือนที่เสร็จแล้วเก่ากว่า 90 วันให้อัตโนมัติ (ประวัติการแก้ไขคอร์สไม่ถูกลบ)
 
 ## เริ่มใช้งานครั้งแรก (เครื่องตัวเอง)
 
@@ -70,7 +71,7 @@ Vercel เขียนไฟล์ไม่ได้ ระบบจึงเก
 
 ## ข้อจำกัดที่ต้องรู้ก่อนใช้งานจริง
 
-- ถ้าไม่ตั้ง Redis ระบบเก็บเป็นไฟล์ JSON (`data/`) ซึ่งใช้ได้กับเครื่องเดียวที่เปิดตลอดเท่านั้น และต้องสำรองโฟลเดอร์ `data/` ส่วน Redis แผนฟรีควรตั้งการสำรองข้อมูลหรือส่งออก CSV เป็นระยะ
+- ถ้าไม่ตั้ง `DATABASE_URL` (หรือ Redis) ระบบเก็บเป็นไฟล์ JSON (`data/`) ซึ่งใช้ได้กับเครื่องเดียวที่เปิดตลอดเท่านั้น และต้องสำรองโฟลเดอร์ `data/` ส่วน Redis แผนฟรีควรตั้งการสำรองข้อมูลหรือส่งออก CSV เป็นระยะ
 - ข้อมูลหน้าจอรีเฟรชอัตโนมัติทุก 10 วินาทีขณะเปิดแท็บ (polling) ไม่ใช่ push แบบทันที
 - ยังไม่มีการยืนยันตัวตนสองชั้น และผู้ป่วยเปลี่ยนนัดเองผ่าน LINE ไม่ได้ (ต้องโทรหาเจ้าหน้าที่ตามเบอร์ในข้อความ)
 - เบอร์ติดต่อเลื่อน/ยกเลิกนัดเริ่มต้นเป็นค่าตัวอย่าง `02-000-0000` ต้องแก้ในหน้า "แจ้งเตือน"
