@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "line:check": "tsx scripts/line-check.ts",
-    "db:migrate": "tsx scripts/db-migrate.ts"
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:seed-demo": "tsx scripts/db-seed-demo.ts"
   },
   "dependencies": {
     "next": "16.4.3",

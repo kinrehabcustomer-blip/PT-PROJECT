@@ -15,8 +15,10 @@ export async function POST(request: Request) {
   const password = String(body.password ?? "");
   const fail = () => NextResponse.json({ message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }, { status: 401 });
   if (!username || !password) return fail();
-  // Counts every attempt (5 per 15 minutes per username), shared across server instances.
-  if (await tooManyAttempts(`login:${username}`, 5, 15 * 60)) {
+  // Optional brute-force guard, off unless LOGIN_MAX_ATTEMPTS is set (attempts per username per 15 minutes).
+  const maxAttempts = Number(process.env.LOGIN_MAX_ATTEMPTS);
+  const limited = Number.isInteger(maxAttempts) && maxAttempts > 0;
+  if (limited && (await tooManyAttempts(`login:${username}`, maxAttempts, 15 * 60))) {
     return NextResponse.json({ message: "ลองเข้าสู่ระบบผิดหลายครั้ง กรุณารอ 15 นาที" }, { status: 429 });
   }
 
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
       data: data.users.length ? undefined : { ...data, users: [admin] },
     }));
     await credentialStore.set(admin.id, hashPassword(bootstrap));
-    await clearAttempts(`login:${username}`);
+    if (limited) await clearAttempts(`login:${username}`);
     await startSession(admin.id);
     return NextResponse.json({ user: admin });
   }
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
   const user = users.find((u) => u.username === username && u.active);
   const hash = user ? await credentialStore.get(user.id) : undefined;
   if (!user || !hash || !verifyPassword(password, hash)) return fail();
-  await clearAttempts(`login:${username}`);
+  if (limited) await clearAttempts(`login:${username}`);
   await startSession(user.id);
   return NextResponse.json({ user });
 }
