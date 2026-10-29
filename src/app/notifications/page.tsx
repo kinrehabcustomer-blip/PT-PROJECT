@@ -11,6 +11,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   "lead-reminder": "เตือนก่อนนัด",
   "schedule-change": "เลื่อนนัด",
   "manual-reminder": "แอดมินส่งเอง",
+  "patient-response": "ตอบกลับจาก LINE",
   cancellation: "ยกเลิกนัด",
   "course-low": "คอร์สใกล้หมด",
   "course-exhausted": "คอร์สครบ",

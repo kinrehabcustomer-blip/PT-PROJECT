@@ -126,6 +126,7 @@ export type NotificationKind =
   | "lead-reminder"
   | "schedule-change"
   | "manual-reminder"
+  | "patient-response"
   | "cancellation"
   | "course-low"
   | "course-exhausted";

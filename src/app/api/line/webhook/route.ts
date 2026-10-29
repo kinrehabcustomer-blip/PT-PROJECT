@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { redeemLinkCode } from "@/application/directory-use-cases";
+import { handleAppointmentPostback } from "@/application/line-responses";
 import { WELCOME_MESSAGE, matchKeyword, replyFor, requestLinkByKeyword, type LinkOutcome } from "@/application/line-linking";
 import { verifyLineSignature } from "@/infrastructure/auth/crypto";
 import { lineGateway } from "@/infrastructure/line/line-gateway";
@@ -10,6 +11,7 @@ interface LineEvent {
   replyToken?: string;
   source?: { userId?: string };
   message?: { type: string; text?: string };
+  postback?: { data: string; params?: { datetime?: string } };
 }
 
 /**
@@ -37,7 +39,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ message: "Bad request" }, { status: 400 });
   }
-  const autoApprove = process.env.LINE_LINK_AUTO_APPROVE?.trim().toLowerCase() === "true";
+  // On by default; set LINE_LINK_AUTO_APPROVE=false to make staff approve each request.
+  const autoApprove = process.env.LINE_LINK_AUTO_APPROVE?.trim().toLowerCase() !== "false";
 
   for (const event of events) {
     const userId = event.source?.userId;
@@ -45,6 +48,15 @@ export async function POST(request: Request) {
 
     if (event.type === "follow") {
       await lineGateway.reply?.(event.replyToken, WELCOME_MESSAGE);
+      continue;
+    }
+    if (event.type === "postback" && event.postback) {
+      const { data: postData, params } = event.postback;
+      const result = await transact((data) => {
+        const r = handleAppointmentPostback(data, { lineUserId: userId, data: postData, datetime: params?.datetime });
+        return { result: { ok: Boolean(r.data), reply: r.reply }, data: r.data };
+      });
+      await lineGateway.reply?.(event.replyToken, result.reply);
       continue;
     }
     const text = event.message?.type === "text" ? event.message.text?.trim() : undefined;

@@ -9,6 +9,32 @@ const PUSH_URL = "https://api.line.me/v2/bot/message/push";
  */
 const REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 
+/**
+ * The message as a card with two buttons that stay in the chat. Confirm sends a
+ * postback; reschedule opens LINE's date-time picker and sends the chosen time.
+ * Both are handled in the webhook (application/line-responses.ts).
+ */
+function appointmentCard(text: string, appointmentId: string) {
+  const id = encodeURIComponent(appointmentId);
+  return {
+    type: "flex",
+    altText: text.slice(0, 400),
+    contents: {
+      type: "bubble",
+      body: { type: "box", layout: "vertical", contents: [{ type: "text", text: text.slice(0, 4000), wrap: true, size: "sm" }] },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        contents: [
+          { type: "button", style: "primary", action: { type: "postback", label: "ยืนยันนัดหมาย", data: `act=confirm&a=${id}`, displayText: "ยืนยันนัดหมาย" } },
+          { type: "button", style: "secondary", action: { type: "datetimepicker", label: "เลื่อนนัดหมาย", data: `act=reschedule&a=${id}`, mode: "datetime" } },
+        ],
+      },
+    },
+  };
+}
+
 export const lineGateway: MessageGateway = {
   async displayName(lineUserId) {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -33,7 +59,7 @@ export const lineGateway: MessageGateway = {
       body: JSON.stringify({ replyToken, messages: [{ type: "text", text }] }),
     }).catch(() => undefined);
   },
-  async send(recipient, text) {
+  async send(recipient, text, options) {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) return { status: "skipped", reason: "ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN" };
 
@@ -45,7 +71,7 @@ export const lineGateway: MessageGateway = {
         method: "POST",
         signal: AbortSignal.timeout(10_000),
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to, messages: [{ type: "text", text: text.slice(0, 5000) }] }),
+        body: JSON.stringify({ to, messages: [options?.appointmentId ? appointmentCard(text, options.appointmentId) : { type: "text", text: text.slice(0, 5000) }] }),
       });
       if (response.ok) return { status: "sent" };
       return { status: "failed", reason: `LINE ตอบกลับ ${response.status}` };

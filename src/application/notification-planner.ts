@@ -20,7 +20,7 @@ function previousDay(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatThaiDate(date: string): string {
+export function formatThaiDate(date: string): string {
   return new Intl.DateTimeFormat("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" }).format(
     appointmentInstant(date, "12:00"),
   );
@@ -77,7 +77,7 @@ export function therapistMessage(data: AppData, a: Appointment, kind: Notificati
     `สถานที่: ${a.location} — ${a.address}`,
     `แผนที่: ${map}`,
     `อาการเบื้องต้น: ${patient?.condition}`,
-    kind === "cancellation" ? "" : "กรุณากดยืนยันรับทราบในระบบ",
+    kind === "cancellation" ? "" : "กรุณากดปุ่ม \"ยืนยันนัดหมาย\" ด้านล่าง หรือยืนยันรับทราบในระบบ",
   ].filter(Boolean).join("\n");
 }
 
