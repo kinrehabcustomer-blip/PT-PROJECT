@@ -27,7 +27,8 @@ test("names compare regardless of spaces and titles", () => {
   assert.equal(normalizeName("คุณ สมชาย  ใจดี"), normalizeName("สมชายใจดี"));
   assert.equal(normalizeName("นางสาว มาลี"), normalizeName("มาลี"));
   assert.equal(normalizeName("ด.ช.ภูริ แก้วมณี"), normalizeName("ภูริแก้วมณี"));
-  assert.equal(normalizeName("กภ. ธนกร"), normalizeName("ธนกร"));
+  // "กภ." is handled by the therapist lookup (see matchKeyword), not as a general title: it would also eat names like กภัทร.
+  assert.notEqual(normalizeName("กภัทร สุข"), normalizeName("ัทรสุข"));
 });
 
 test("keywords find a patient, a relative or a therapist", () => {

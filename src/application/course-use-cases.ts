@@ -23,6 +23,10 @@ export function adjustCourse(
   if (!Number.isInteger(totalSessions) || !Number.isInteger(usedSessions) || totalSessions < 1 || usedSessions < 0) {
     return { ok: false, message: "จำนวนครั้งต้องเป็นจำนวนเต็ม และจำนวนครั้งทั้งหมดต้องมากกว่า 0" };
   }
+  const recorded = course.history.filter((h) => !h.voided).length;
+  if (usedSessions < recorded) {
+    return { ok: false, message: `ประวัติยังมีรายการตัดคอร์สที่ใช้งานอยู่ ${recorded} รายการ ลดจำนวนที่ใช้ไปต่ำกว่านี้ไม่ได้ ให้ยกเลิกรายการในประวัติแทน` };
+  }
   if (usedSessions > totalSessions) {
     return { ok: false, message: "จำนวนครั้งที่ใช้ไปต้องไม่เกินจำนวนครั้งทั้งหมด" };
   }

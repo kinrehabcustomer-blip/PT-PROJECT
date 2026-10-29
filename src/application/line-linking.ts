@@ -11,7 +11,9 @@ import type { ActionContext, AppointmentActionResult } from "@/application/appoi
  */
 
 const MAX_PENDING_PER_LINE_USER = 3;
-const HONORIFICS = /^(นางสาว|นาง|นาย|คุณ|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง|กภ\.?)/;
+const HONORIFICS = /^(นางสาว|นาง|นาย|คุณ|น\.ส\.|ด\.ช\.|ด\.ญ\.|เด็กชาย|เด็กหญิง)/;
+/** "กภ." or "กภ " (physiotherapist). A bare "กภ" would also catch names like กภัทร. */
+const THERAPIST_TITLE = /^กภ(\.|\s)\s*/;
 
 const newId = () => `lr-${globalThis.crypto.randomUUID().slice(0, 8)}`;
 
@@ -25,12 +27,16 @@ export type KeywordMatch =
   | { kind: "ambiguous" }
   | { kind: "none" };
 
-function findUnique<T extends { name: string }>(items: T[], typed: string): T | "ambiguous" | undefined {
-  const exact = items.filter((i) => normalizeName(i.name) === typed);
+function findUnique<T extends { name: string }>(
+  items: T[],
+  typed: string,
+  normalize: (name: string) => string = normalizeName,
+): T | "ambiguous" | undefined {
+  const exact = items.filter((i) => normalize(i.name) === typed);
   if (exact.length === 1) return exact[0];
   if (exact.length > 1) return "ambiguous";
   // Typing only the first and last name of "คุณยายบุญเลี้ยง ศรีสุข" should still find her.
-  const tail = typed.length >= 6 ? items.filter((i) => normalizeName(i.name).endsWith(typed)) : [];
+  const tail = typed.length >= 6 ? items.filter((i) => normalize(i.name).endsWith(typed)) : [];
   if (tail.length === 1) return tail[0];
   return tail.length > 1 ? "ambiguous" : undefined;
 }
@@ -44,8 +50,9 @@ export function matchKeyword(data: AppData, text: string): KeywordMatch {
   const raw = text.normalize("NFC").trim();
   if (!raw || raw.length > 80) return { kind: "none" };
 
-  if (/^กภ/.test(raw)) {
-    const hit = findUnique(data.therapists, normalizeName(raw));
+  if (THERAPIST_TITLE.test(raw)) {
+    const withoutTitle = (name: string) => normalizeName(name.replace(THERAPIST_TITLE, ""));
+    const hit = findUnique(data.therapists, withoutTitle(raw), withoutTitle);
     if (hit === "ambiguous") return { kind: "ambiguous" };
     return hit ? { kind: "match", target: "therapist", targetId: hit.id, name: hit.name } : { kind: "none" };
   }

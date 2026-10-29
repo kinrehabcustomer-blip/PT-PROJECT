@@ -90,8 +90,10 @@ export function planAppointmentNotifications(
 ): AppNotification[] {
   const { settings } = data;
   const patient = data.patients.find(({ id }) => id === a.patientId);
-  const patientMode = patient?.reminder?.patientReminder ?? settings.patientReminder;
+  const requestedMode = patient?.reminder?.patientReminder ?? settings.patientReminder;
   const patientLeadHours = patient?.reminder?.leadHours ?? settings.leadHours;
+  // "Only shortly before" cannot work with no lead time; fall back to the evening-before reminder rather than sending nothing.
+  const patientMode = requestedMode === "lead" && patientLeadHours === 0 ? "evening" : requestedMode;
   const nowIso = now.toISOString();
   const out: AppNotification[] = [
     makeNotification({

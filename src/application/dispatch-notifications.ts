@@ -25,7 +25,7 @@ export function resolveRecipients(data: AppData, n: AppNotification): string[] {
     return t?.lineUserId ? [t.lineUserId] : [];
   }
   const p = data.patients.find(({ id }) => id === n.recipientId);
-  return [p?.lineUserId, p?.relativeLineUserId].filter((x): x is string => Boolean(x));
+  return [...new Set([p?.lineUserId, p?.relativeLineUserId].filter((x): x is string => Boolean(x)))];
 }
 
 /** Why a due message should be dropped instead of sent, or null if it is still relevant. */

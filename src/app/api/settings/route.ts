@@ -16,6 +16,9 @@ export async function PUT(request: Request) {
     if (patientReminder !== "evening" && patientReminder !== "lead" && patientReminder !== "both") {
       return { ok: false, message: "รูปแบบการแจ้งเตือนผู้ป่วยไม่ถูกต้อง" };
     }
+    if (patientReminder === "lead" && leadHours === 0) {
+      return { ok: false, message: "เลือก \"ก่อนนัด\" ต้องกำหนดเวลาเตือนก่อนนัด 1 หรือ 2 ชั่วโมง" };
+    }
     const contactPhone = String(body.contactPhone ?? "").trim();
     if (!contactPhone) return { ok: false, message: "กรุณาระบุเบอร์ติดต่อสำหรับเลื่อนหรือยกเลิกนัด" };
     const settings: NotificationSettings = {

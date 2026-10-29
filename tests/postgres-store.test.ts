@@ -64,7 +64,7 @@ test("a use case persists: booking, acknowledging and completing deduct once", a
 
   for (const step of [
     (x: AppData) => acknowledgeAppointment(x, id, { actor: { name: "t", role: "therapist", therapistId: "t-3" } }),
-    (x: AppData) => completeAppointment(x, id, { now, actor: admin }),
+    (x: AppData) => completeAppointment(x, id, { now: new Date("2026-11-05T05:00:00Z"), actor: admin }),
   ]) {
     await repo.transact((x) => { const r = step(x); assert.equal(r.ok, true); return { result: r, data: r.ok ? r.data : undefined }; });
   }

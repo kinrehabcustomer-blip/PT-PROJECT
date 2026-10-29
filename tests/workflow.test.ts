@@ -29,7 +29,7 @@ test("full lifecycle: book → acknowledge → complete deducts once, audited, h
   let d = ok(createAppointment(seedData, booking, { now, actor: staff }));
   const id = d.appointments.at(-1)!.id;
   d = ok(acknowledgeAppointment(d, id, { actor: { name: "x", role: "therapist", therapistId: "t-3" } }));
-  d = ok(completeAppointment(d, id, { now, actor: { name: "x", role: "therapist", therapistId: "t-3" } }));
+  d = ok(completeAppointment(d, id, { now: new Date("2026-11-05T05:00:00Z"), actor: { name: "x", role: "therapist", therapistId: "t-3" } }));
   const c = d.courses.find((x) => x.id === "c-4")!;
   assert.equal(c.usedSessions, 5);
   assert.equal(c.history[0].appointmentId, id);

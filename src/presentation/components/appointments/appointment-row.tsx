@@ -1,4 +1,5 @@
 import type React from "react";
+import { bangkokToday } from "@/domain/calendar";
 import type { DashboardAppointment, Role } from "@/domain/models";
 import type { LineStatus } from "@/application/line-status";
 
@@ -46,6 +47,8 @@ export function AppointmentRow({
   onRemind: () => void;
 }) {
   const { status } = appointment;
+  const notYetDay = appointment.date > bangkokToday(new Date());
+  const notYetHint = notYetDay ? "ยังไม่ถึงวันนัด" : undefined;
   const open = status === "รอยืนยัน" || status === "ยืนยันแล้ว";
   const awaitingNoShowDecision = status === "ไม่มาตามนัด" && !appointment.noShowResolution;
 
@@ -79,10 +82,10 @@ export function AppointmentRow({
         {slot(awaitingNoShowDecision && role === "admin"
           ? <button className="row-action" disabled={busy} onClick={() => onResolveNoShow(false)}>ไม่ตัดคอร์ส</button>
           : status === "ยืนยันแล้ว" && role !== "staff"
-            ? <button className="row-action" disabled={busy} onClick={onComplete} title="บันทึกว่าให้บริการเสร็จและตัดคอร์ส 1 ครั้ง">ให้บริการแล้ว</button>
+            ? <button className="row-action" disabled={busy || notYetDay} onClick={onComplete} title={notYetHint ?? "บันทึกว่าให้บริการเสร็จและตัดคอร์ส 1 ครั้ง"}>ให้บริการแล้ว</button>
             : null)}
         {slot(open && role !== "therapist" ? <button className="row-action" disabled={busy} onClick={onReschedule}>เลื่อนนัด</button> : null)}
-        {slot(open && role !== "therapist" ? <button className="row-action danger" disabled={busy} onClick={onNoShow}>ไม่มาตามนัด</button> : null)}
+        {slot(open && role !== "therapist" ? <button className="row-action danger" disabled={busy || notYetDay} onClick={onNoShow} title={notYetHint}>ไม่มาตามนัด</button> : null)}
         {slot(open && role !== "therapist" ? <button className="row-action danger" disabled={busy} onClick={onCancel}>ยกเลิก</button> : null)}
         {slot(awaitingNoShowDecision && role !== "admin"
           ? <span className="ack-note">รอแอดมินตัดสิน</span>

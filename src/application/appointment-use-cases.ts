@@ -6,6 +6,7 @@ import type {
   TreatmentCourse,
 } from "@/domain/models";
 import { remainingSessions } from "@/domain/models";
+import { bangkokToday, isValidDate, isValidTime } from "@/domain/calendar";
 import {
   appointmentInstant,
   planAppointmentNotifications,
@@ -64,7 +65,7 @@ export function createAppointment(
   if (!data.therapists.some(({ id }) => id === input.therapistId)) {
     return { ok: false, message: "ไม่พบข้อมูลนักกายภาพบำบัด" };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^\d{2}:\d{2}$/.test(input.time)) {
+  if (!isValidDate(input.date) || !isValidTime(input.time)) {
     return { ok: false, message: "วันหรือเวลานัดไม่ถูกต้อง" };
   }
   if (!input.address.trim()) return { ok: false, message: "กรุณาระบุที่อยู่ที่ใช้เข้ารับบริการ" };
@@ -77,7 +78,11 @@ export function createAppointment(
 
   // A session already held by an open appointment is not available for a new booking.
   const held = (courseId: string) =>
-    data.appointments.filter((a) => a.courseId === courseId && (a.status === "รอยืนยัน" || a.status === "ยืนยันแล้ว")).length;
+    data.appointments.filter(
+      (a) =>
+        a.courseId === courseId &&
+        (a.status === "รอยืนยัน" || a.status === "ยืนยันแล้ว" || (a.status === "ไม่มาตามนัด" && !a.noShowResolution)),
+    ).length;
   const usable = data.courses.filter((c) => c.patientId === input.patientId && remainingSessions(c) - held(c.id) > 0);
   if (!usable.length) {
     return { ok: false, message: "ผู้รับบริการนี้ไม่มีคอร์สที่เหลือจำนวนครั้งว่าง (อาจมีนัดอื่นจองครบแล้ว)" };
@@ -92,7 +97,7 @@ export function createAppointment(
   if (clash) return { ok: false, message: "นักกายภาพบำบัดมีนัดหมายอื่นในวันและเวลาเดียวกัน" };
 
   const appointment: Appointment = {
-    id: `a-${now.getTime()}`,
+    id: newAppointmentId(data),
     patientId: input.patientId,
     therapistId: input.therapistId,
     courseId: course.id,
@@ -128,8 +133,11 @@ export function rescheduleAppointment(
   if (appointment.status === "เสร็จสิ้น" || appointment.status === "ยกเลิก") {
     return { ok: false, message: "สถานะนัดหมายนี้ไม่สามารถเลื่อนได้" };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(change.date) || !/^\d{2}:\d{2}$/.test(change.time)) {
+  if (!isValidDate(change.date) || !isValidTime(change.time)) {
     return { ok: false, message: "วันหรือเวลานัดไม่ถูกต้อง" };
+  }
+  if (appointment.noShowResolution === "deducted") {
+    return { ok: false, message: "นัดนี้ถูกตัดคอร์สไปแล้วเพราะไม่มาตามนัด ไม่สามารถเลื่อนได้ กรุณาสร้างนัดใหม่" };
   }
   if (change.date === appointment.date && change.time === appointment.time) {
     return { ok: false, message: "วันและเวลาใหม่ตรงกับนัดเดิม" };
@@ -197,6 +205,8 @@ export function completeAppointment(
     return { ok: false, message: "นัดที่ผู้รับบริการไม่มาต้องยืนยันการตัดคอร์สโดยแอดมินก่อน" };
   }
 
+  if (appointment.date > bangkokToday(ctx.now ?? new Date())) return { ok: false, message: FUTURE_DAY };
+
   const deducted = deductSession(data, appointment, ctx, "ให้บริการเรียบร้อย");
   if (!deducted.ok) return deducted;
   return {
@@ -248,6 +258,7 @@ export function markNoShow(
   if (appointment.status !== "รอยืนยัน" && appointment.status !== "ยืนยันแล้ว") {
     return { ok: false, message: "สถานะนัดหมายนี้ไม่สามารถบันทึกว่าไม่มาตามนัดได้" };
   }
+  if (appointment.date > bangkokToday(ctx.now ?? new Date())) return { ok: false, message: FUTURE_DAY };
   return {
     ok: true,
     data: updateAppointment(data, appointmentId, (item) => ({ ...item, status: "ไม่มาตามนัด" })),
@@ -282,6 +293,16 @@ export function resolveNoShow(
     data: updateAppointment(deducted.data, appointmentId, (item) => ({ ...item, noShowResolution: "deducted" })),
   };
 }
+
+function newAppointmentId(data: AppData): string {
+  const taken = new Set(data.appointments.map((a) => a.id));
+  for (;;) {
+    const id = `a-${globalThis.crypto.randomUUID().slice(0, 8)}`;
+    if (!taken.has(id)) return id;
+  }
+}
+
+const FUTURE_DAY = "ยังไม่ถึงวันนัด จึงบันทึกผลไม่ได้";
 
 function findTherapistClash(
   data: AppData,

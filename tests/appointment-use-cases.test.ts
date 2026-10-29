@@ -6,9 +6,10 @@ import {
   completeAppointment,
 } from "../src/application/appointment-use-cases";
 
-const admin = { actor: { name: "แอดมิน", role: "admin" as const } };
-const therapist1 = { actor: { name: "กภ.", role: "therapist" as const, therapistId: "t-1" } };
-const staff = { actor: { name: "เจ้าหน้าที่", role: "staff" as const } };
+const SAME_DAY = new Date("2026-10-29T05:00:00Z"); // the day of the demo visits, so results never depend on the real clock
+const admin = { now: SAME_DAY, actor: { name: "แอดมิน", role: "admin" as const } };
+const therapist1 = { now: SAME_DAY, actor: { name: "กภ.", role: "therapist" as const, therapistId: "t-1" } };
+const staff = { now: SAME_DAY, actor: { name: "เจ้าหน้าที่", role: "staff" as const } };
 import { seedData } from "../src/infrastructure/repositories/seed-data";
 
 test("completing an appointment deducts exactly one course session and records history", () => {
@@ -54,7 +55,7 @@ test("acknowledging a pending appointment confirms receipt", () => {
 });
 
 test("a full course cannot be deducted", () => {
-  const result = completeAppointment(seedData, "a-5", { actor: { name: "กภ.", role: "therapist", therapistId: "t-2" } });
+  const result = completeAppointment(seedData, "a-5", { now: new Date("2026-10-30T05:00:00Z"), actor: { name: "กภ.", role: "therapist", therapistId: "t-2" } });
 
   assert.equal(result.ok, false);
   if (result.ok) return;
