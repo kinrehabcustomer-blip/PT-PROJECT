@@ -16,7 +16,9 @@ const navigation: ReadonlyArray<readonly [string, string, string, readonly Role[
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { role, data } = useApp();
+  const { role, data, user } = useApp();
+  // Until we know who is signed in we cannot know which menu they get: show placeholders, not a guess.
+  const loading = !user;
   const pending = data?.linkRequests.length ?? 0;
 
   return (
@@ -26,8 +28,13 @@ export function AppSidebar() {
         <div className="brand-text"><div className="brand-name">PT Care</div><div className="brand-sub">Care, connected.</div></div>
       </div>
       <div className="nav-label">เมนูหลัก</div>
-      <nav className="nav-list" aria-label="เมนูหลัก">
-        {navigation.filter(([, , , roles]) => roles.includes(role)).map(([icon, label, href]) => (
+      <nav className="nav-list" aria-label="เมนูหลัก" aria-busy={loading}>
+        {loading && [58, 72, 64, 80, 52].map((width, i) => (
+          <div className="nav-item nav-skeleton" key={i} aria-hidden="true">
+            <span className="skeleton skeleton-icon" /><span className="skeleton skeleton-line" style={{ width: `${width}%` }} />
+          </div>
+        ))}
+        {!loading && navigation.filter(([, , , roles]) => roles.includes(role)).map(([icon, label, href]) => (
           <Link key={href} href={href} className={`nav-item ${pathname === href ? "active" : ""}`} aria-current={pathname === href ? "page" : undefined}>
             <span className="nav-icon">{icon}</span><span className="nav-text">{label}{href === "/patients" && pending > 0 ? <span className="nav-badge" aria-label={`${pending} คำขอรอยืนยัน`}>{pending}</span> : null}</span>
           </Link>
