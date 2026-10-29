@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { AppData, Role, User } from "@/domain/models";
 import { ApiError, api } from "@/infrastructure/api/client";
@@ -27,7 +27,8 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null);
 
 export const ROLE_LABEL: Record<Role, string> = { admin: "ผู้ดูแลระบบ", staff: "เจ้าหน้าที่", therapist: "นักกายภาพบำบัด" };
-const POLL_MS = 10_000;
+const POLL_MS = 20_000;
+const MIN_GAP_MS = 5_000;
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -39,7 +40,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const notify = useCallback((message: string, error?: boolean) => setToast({ message, error }), []);
 
+  // One refresh at a time: a slow server must never pile up requests behind each other.
+  const inFlight = useRef(false);
+  const lastLoad = useRef(0);
+
   const load = useCallback(async (quiet: boolean) => {
+    if (inFlight.current) return;
+    if (quiet && Date.now() - lastLoad.current < MIN_GAP_MS) return;
+    inFlight.current = true;
     try {
       const result = await api.load();
       setUser(result.user);
@@ -52,6 +60,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else if (!quiet) {
         notify(error instanceof Error ? error.message : "โหลดข้อมูลไม่สำเร็จ", true);
       }
+    } finally {
+      inFlight.current = false;
+      lastLoad.current = Date.now();
     }
   }, [notify, router]);
 

@@ -49,7 +49,7 @@ interface Spec<T> {
 }
 
 const nn = <T,>(value: T | null | undefined): T | undefined => (value === null || value === undefined ? undefined : value);
-const iso = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
+const iso = (value: unknown): string => (value instanceof Date ? value : new Date(String(value))).toISOString();
 const isoOpt = (value: unknown): string | undefined => (value === null || value === undefined ? undefined : iso(value));
 const json = (value: unknown): string | null => (value === undefined || value === null ? null : JSON.stringify(value));
 
@@ -197,39 +197,46 @@ const EMPTY: AppData = {
   settings: undefined as unknown as NotificationSettings,
 };
 
-async function selectAll<T>(tx: SqlTx, spec: Spec<T>): Promise<T[]> {
-  const { rows } = await tx.query(`SELECT * FROM ${spec.table} ORDER BY ${spec.orderBy}`);
-  return rows.map((r) => spec.fromRow(r as Row));
+/**
+ * Every table in ONE statement (one network round trip, one consistent snapshot).
+ * The app often runs far from the database, so the number of round trips
+ * dominates the response time.
+ */
+function loadAllSql(): string {
+  const parts = (SPECS as Array<Spec<unknown>>).map(
+    (spec) => `'${spec.table}', (SELECT coalesce(json_agg(t ORDER BY ${spec.orderBy}), '[]'::json) FROM ${spec.table} t)`,
+  );
+  return `SELECT json_build_object('settings', (SELECT row_to_json(s) FROM settings s WHERE id = 1), ${parts.join(", ")}) AS data`;
 }
 
 async function readState(tx: SqlTx): Promise<{ data: AppData; initialized: boolean }> {
-  const settingsRows = (await tx.query("SELECT * FROM settings WHERE id = 1")).rows as Row[];
-  if (!settingsRows.length) return { data: seedData, initialized: false };
-  const s = settingsRows[0];
-  const settings: NotificationSettings = {
-    channel: s.channel as "LINE", eveningTime: s.evening_time as string, leadHours: s.lead_hours as 0 | 1 | 2,
-    patientReminder: s.patient_reminder as NotificationSettings["patientReminder"], contactPhone: s.contact_phone as string,
-  };
-  const courseRows = await selectAll(tx, courses);
-  const historyRows = await selectAll(tx, history);
+  const { rows } = await tx.query<{ data: Record<string, unknown> }>(loadAllSql());
+  const all = rows[0].data;
+  const s = all.settings as Row | null;
+  if (!s) return { data: seedData, initialized: false };
+
+  const list = <T,>(spec: Spec<T>): T[] => ((all[spec.table] as Row[]) ?? []).map((r) => spec.fromRow(r));
   const byCourse = new Map<string, CourseHistoryEntry[]>();
-  for (const { courseId, position: _p, ...entry } of historyRows) {
+  for (const { courseId, position: _p, ...entry } of list(history)) {
     byCourse.set(courseId, [...(byCourse.get(courseId) ?? []), entry]);
   }
   return {
     initialized: true,
     data: {
-      settings,
-      patients: await selectAll(tx, patients),
-      therapists: await selectAll(tx, therapists),
-      courses: courseRows.map((c) => ({ ...c, history: byCourse.get(c.id) ?? [] })),
-      appointments: await selectAll(tx, appointments),
-      notifications: await selectAll(tx, notifications),
-      courseAudit: await selectAll(tx, audit),
-      users: await selectAll(tx, users),
-      linkCodes: await selectAll(tx, linkCodes),
-      linkRequests: await selectAll(tx, linkRequests),
-      assignments: await selectAll(tx, assignments),
+      settings: {
+        channel: s.channel as "LINE", eveningTime: s.evening_time as string, leadHours: s.lead_hours as 0 | 1 | 2,
+        patientReminder: s.patient_reminder as NotificationSettings["patientReminder"], contactPhone: s.contact_phone as string,
+      },
+      patients: list(patients),
+      therapists: list(therapists),
+      courses: list(courses).map((c) => ({ ...c, history: byCourse.get(c.id) ?? [] })),
+      appointments: list(appointments),
+      notifications: list(notifications),
+      courseAudit: list(audit),
+      users: list(users),
+      linkCodes: list(linkCodes),
+      linkRequests: list(linkRequests),
+      assignments: list(assignments),
     },
   };
 }
@@ -282,10 +289,8 @@ async function writeDiff(tx: SqlTx, before: AppData, after: AppData): Promise<vo
 export function createPostgresRepository(db: SqlDb) {
   return {
     async loadData(): Promise<AppData> {
-      return db.transaction(async (tx) => {
-        await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
-        return (await readState(tx)).data;
-      });
+      // A single statement already sees one consistent snapshot, so no transaction is needed.
+      return (await readState(db)).data;
     },
 
     /**
