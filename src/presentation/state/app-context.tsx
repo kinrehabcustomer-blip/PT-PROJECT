@@ -27,8 +27,10 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null);
 
 export const ROLE_LABEL: Record<Role, string> = { admin: "ผู้ดูแลระบบ", staff: "เจ้าหน้าที่", therapist: "นักกายภาพบำบัด" };
-const POLL_MS = 20_000;
+const POLL_MS = 30_000;
 const MIN_GAP_MS = 5_000;
+/** Stop refreshing in the background once nobody has touched the page for this long. */
+const IDLE_MS = 5 * 60_000;
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -43,17 +45,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // One refresh at a time: a slow server must never pile up requests behind each other.
   const inFlight = useRef(false);
   const lastLoad = useRef(0);
+  const etag = useRef<string | null>(null);
+  const lastActivity = useRef(0);
 
   const load = useCallback(async (quiet: boolean) => {
     if (inFlight.current) return;
     if (quiet && Date.now() - lastLoad.current < MIN_GAP_MS) return;
     inFlight.current = true;
     try {
-      const result = await api.load();
-      setUser(result.user);
-      setData(result.data);
+      // Unchanged since last time: the server sends nothing and we skip re-rendering.
+      const result = await api.load(quiet ? (etag.current ?? undefined) : undefined);
+      if (result) {
+        etag.current = result.etag;
+        setUser(result.user);
+        setData(result.data);
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        etag.current = null;
         setUser(null);
         setData(null);
         router.replace("/login");
@@ -68,18 +77,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(() => load(false), [load]);
 
-  // Initial load, then keep the screen current while the tab is visible.
+  // Initial load, then keep the screen current while the tab is visible and someone is using it.
   useEffect(() => {
     if (onLogin) return;
+    lastActivity.current = Date.now();
     const first = window.setTimeout(() => void load(false), 0);
+    const idle = () => Date.now() - lastActivity.current > IDLE_MS;
     const poll = window.setInterval(() => {
-      if (document.visibilityState === "visible") void load(true);
+      if (document.visibilityState === "visible" && !idle()) void load(true);
     }, POLL_MS);
-    const onVisible = () => document.visibilityState === "visible" && void load(true);
+    // Coming back (to the tab, or after being idle) refreshes at once.
+    const wake = () => {
+      const wasIdle = idle();
+      lastActivity.current = Date.now();
+      if (wasIdle) void load(true);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") wake();
+    };
+    const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    events.forEach((name) => window.addEventListener(name, wake, { passive: true }));
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(poll);
+      events.forEach((name) => window.removeEventListener(name, wake));
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load, onLogin]);
@@ -93,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const act: AppState["act"] = async (method, path, body, success) => {
     try {
       const next = await api.send(method, path, body);
+      etag.current = null;
       setData(next);
       const outcome = typeof success === "function" ? success(next) : { message: success };
       notify(outcome.message, outcome.error);
@@ -106,6 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await api.logout();
+    etag.current = null;
     setUser(null);
     setData(null);
     router.replace("/login");

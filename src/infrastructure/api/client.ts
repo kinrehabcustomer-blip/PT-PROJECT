@@ -19,8 +19,15 @@ async function parse<T>(response: Response): Promise<T> {
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export const api = {
-  async load(): Promise<{ user: User; data: AppData }> {
-    return parse(await fetch("/api/data", { cache: "no-store" }));
+  /**
+   * Fetches the app state. Pass the ETag of what you already have: if nothing
+   * changed the server answers 304 with no body and this resolves to null.
+   */
+  async load(etag?: string): Promise<{ user: User; data: AppData; etag: string | null } | null> {
+    const response = await fetch("/api/data", { cache: "no-store", headers: etag ? { "If-None-Match": etag } : {} });
+    if (response.status === 304) return null;
+    const payload = await parse<{ user: User; data: AppData }>(response);
+    return { ...payload, etag: response.headers.get("ETag") };
   },
   async send(method: "POST" | "PUT", path: string, body: Record<string, unknown>): Promise<AppData> {
     return parse(await fetch(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) }));

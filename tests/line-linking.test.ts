@@ -164,3 +164,22 @@ test("booking still works for a therapist who is not the patient's usual one (co
   const r = createAppointment(seedData, { patientId: "p-4", therapistId: "t-3", date: "2026-11-05", time: "10:00", location: "คลินิก", address: "บางนา" }, { now, actor: staff });
   assert.equal(r.ok, true);
 });
+
+import { recentNotifications } from "../src/application/data-view";
+
+test("the browser gets recent notifications and anything tied to an open appointment, not years of history", () => {
+  const mk = (id: string, scheduledAt: string, status: "sent" | "queued", appointmentId?: string) => ({
+    id, dedupeKey: id, kind: "lead-reminder" as const, audience: "patient" as const, recipientId: "p-1", message: "x", scheduledAt, status, appointmentId,
+  });
+  const data: AppData = {
+    ...seedData,
+    notifications: [
+      mk("old-closed", "2026-01-01T00:00:00.000Z", "sent", "a-h1"),      // finished appointment, long ago -> dropped
+      mk("old-open", "2026-01-01T00:00:00.000Z", "sent", "a-1"),         // a-1 is still open -> kept so its status stays correct
+      mk("old-queued", "2026-01-01T00:00:00.000Z", "queued"),            // still waiting -> kept
+      mk("recent", "2026-10-25T00:00:00.000Z", "sent", "a-h1"),          // within 14 days -> kept
+    ],
+  };
+  const ids = recentNotifications(data, new Date("2026-10-29T00:00:00Z")).map((n) => n.id).sort();
+  assert.deepEqual(ids, ["old-open", "old-queued", "recent"]);
+});
