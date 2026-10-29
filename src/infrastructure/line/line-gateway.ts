@@ -10,6 +10,19 @@ const PUSH_URL = "https://api.line.me/v2/bot/message/push";
 const REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 
 export const lineGateway: MessageGateway = {
+  async displayName(lineUserId) {
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) return undefined;
+    try {
+      const res = await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUserId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      return res.ok ? ((await res.json()) as { displayName?: string }).displayName : undefined;
+    } catch {
+      return undefined;
+    }
+  },
   async reply(replyToken, text) {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) return;

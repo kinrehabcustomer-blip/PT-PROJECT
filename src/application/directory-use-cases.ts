@@ -243,3 +243,39 @@ export function unlinkLine(
   const field = target === "relative" ? "relativeLineUserId" : "lineUserId";
   return { ok: true, data: { ...data, patients: data.patients.map((p) => (p.id === targetId ? { ...p, [field]: undefined } : p)) } };
 }
+
+// --- Which patients are in which therapist's care ---------------------------------------
+
+const careId = (therapistId: string, patientId: string) => `${therapistId}:${patientId}`;
+
+export function assignPatient(
+  data: AppData,
+  therapistId: string,
+  patientId: string,
+  ctx: ActionContext = {},
+): AppointmentActionResult {
+  if (!isFrontDesk(ctx)) return { ok: false, message: DENIED };
+  if (!data.therapists.some(({ id }) => id === therapistId)) return { ok: false, message: "ไม่พบนักกายภาพบำบัด" };
+  if (!data.patients.some(({ id }) => id === patientId)) return { ok: false, message: "ไม่พบผู้รับบริการ" };
+  const id = careId(therapistId, patientId);
+  if (data.assignments.some((a) => a.id === id)) {
+    return { ok: false, message: "ผู้รับบริการคนนี้อยู่ในความดูแลของนักกายภาพคนนี้แล้ว" };
+  }
+  return { ok: true, data: { ...data, assignments: [...data.assignments, { id, therapistId, patientId }] } };
+}
+
+export function unassignPatient(
+  data: AppData,
+  therapistId: string,
+  patientId: string,
+  ctx: ActionContext = {},
+): AppointmentActionResult {
+  if (!isFrontDesk(ctx)) return { ok: false, message: DENIED };
+  const id = careId(therapistId, patientId);
+  if (!data.assignments.some((a) => a.id === id)) return { ok: false, message: "ไม่พบรายการนี้ในความดูแล" };
+  const open = data.appointments.some(
+    (a) => a.therapistId === therapistId && a.patientId === patientId && (a.status === "รอยืนยัน" || a.status === "ยืนยันแล้ว"),
+  );
+  if (open) return { ok: false, message: "ยังมีนัดหมายที่เปิดอยู่กับนักกายภาพคนนี้ กรุณาเลื่อนหรือยกเลิกนัดก่อนนำออกจากความดูแล" };
+  return { ok: true, data: { ...data, assignments: data.assignments.filter((a) => a.id !== id) } };
+}

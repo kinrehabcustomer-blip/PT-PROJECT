@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Role } from "@/domain/models";
+import { LinkRequestsPanel } from "@/presentation/components/line/link-requests-panel";
 import { ROLE_LABEL, useApp } from "@/presentation/state/app-context";
 
 export default function TeamPage() {
@@ -10,26 +11,25 @@ export default function TeamPage() {
   if (!data) return null;
   if (role !== "admin") return <div className="panel empty-state">หน้านี้สำหรับผู้ดูแลระบบเท่านั้น</div>;
 
-  const codeFor = (id: string) => data.linkCodes.find((c) => c.target === "therapist" && c.targetId === id && new Date(c.expiresAt) > new Date());
-
   return (
     <>
       <div className="page-heading"><div><h1>ผู้ใช้และทีม</h1><p>บัญชีเข้าสู่ระบบ นักกายภาพบำบัด และการผูก LINE</p></div></div>
 
+      <LinkRequestsPanel />
+
       <section className="panel stack-pad" style={{ marginBottom: 16 }}>
         <div className="panel-title">นักกายภาพบำบัด</div>
-        {data.therapists.map((t) => {
-          const code = codeFor(t.id);
-          return (
-            <div className="history-line" key={t.id}>
-              <span>{t.name} · {t.phone} · LINE: {t.lineUserId ? "ผูกแล้ว" : "ยังไม่ผูก"}{code && <> · ให้ส่งรหัส <strong className="code">{code.code}</strong> ไปที่ LINE Official Account</>}</span>
-              <span className="appointment-actions">
-                {!t.lineUserId && <button className="row-action" onClick={() => act("POST", "/api/link-codes", { target: "therapist", targetId: t.id }, "สร้างรหัสผูก LINE แล้ว (หมดอายุใน 24 ชม.)")}>สร้างรหัสผูก LINE</button>}
-                {t.lineUserId && <button className="row-action danger" onClick={() => window.confirm("ยกเลิกการผูก LINE?") && act("POST", "/api/link-codes", { target: "therapist", targetId: t.id, unlink: true }, "ยกเลิกการผูกแล้ว")}>ยกเลิกการผูก</button>}
-              </span>
-            </div>
-          );
-        })}
+        {data.therapists.map((t) => (
+          <div className="history-line" key={t.id}>
+            <span>
+              {t.name} · {t.phone} · LINE: {t.lineUserId ? "ผูกแล้ว" : "ยังไม่ผูก"}
+              {!t.lineUserId && <> · ให้พิมพ์ส่ง LINE ของคลินิกว่า <strong className="code">{t.name.startsWith("กภ") ? t.name : `กภ. ${t.name}`}</strong></>}
+            </span>
+            <span className="appointment-actions">
+              {t.lineUserId && <button className="row-action danger" onClick={() => window.confirm("ยกเลิกการผูก LINE?") && act("POST", "/api/link-codes", { target: "therapist", targetId: t.id, unlink: true }, "ยกเลิกการผูกแล้ว")}>ยกเลิกการผูก</button>}
+            </span>
+          </div>
+        ))}
         <form className="adjust-form" action={(fd) => { void act("POST", "/api/therapists", Object.fromEntries(fd), "เพิ่มนักกายภาพบำบัดแล้ว"); }}>
           <h3>เพิ่มนักกายภาพบำบัด</h3>
           <label>ชื่อ<input name="name" placeholder="กภ. ..." required /></label>

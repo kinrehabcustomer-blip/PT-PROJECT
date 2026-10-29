@@ -9,6 +9,8 @@ export type SendOutcome =
 export interface MessageGateway {
   send(recipientLineId: string, text: string): Promise<SendOutcome>;
   reply?(replyToken: string, text: string): Promise<void>;
+  /** The LINE display name of a user, to help staff recognise who asked to be linked. */
+  displayName?(lineUserId: string): Promise<string | undefined>;
 }
 
 export const ADMIN_RECIPIENT = "admin";

@@ -4,7 +4,9 @@ import type {
   Appointment,
   CourseAuditEntry,
   CourseHistoryEntry,
+  CareAssignment,
   LinkCode,
+  LinkRequest,
   NotificationSettings,
   Patient,
   Therapist,
@@ -159,8 +161,27 @@ const linkCodes: Spec<LinkCode> = {
   list: (d) => d.linkCodes,
 };
 
+const linkRequests: Spec<LinkRequest> = {
+  table: "link_requests", keyColumn: "id", key: (r) => r.id, orderBy: "requested_at",
+  columns: ["id", "target", "target_id", "line_user_id", "display_name", "requested_at"],
+  values: (r) => [r.id, r.target, r.targetId, r.lineUserId, r.displayName ?? null, r.requestedAt],
+  fromRow: (r) => ({
+    id: r.id as string, target: r.target as LinkRequest["target"], targetId: r.target_id as string,
+    lineUserId: r.line_user_id as string, displayName: nn(r.display_name as string | null), requestedAt: iso(r.requested_at),
+  }),
+  list: (d) => d.linkRequests,
+};
+
+const assignments: Spec<CareAssignment> = {
+  table: "therapist_patients", keyColumn: "id", key: (a) => a.id, orderBy: "seq",
+  columns: ["id", "therapist_id", "patient_id"],
+  values: (a) => [a.id, a.therapistId, a.patientId],
+  fromRow: (r) => ({ id: r.id as string, therapistId: r.therapist_id as string, patientId: r.patient_id as string }),
+  list: (d) => d.assignments,
+};
+
 // Parents before children when writing; the reverse when deleting.
-const SPECS = [patients, therapists, courses, history, appointments, users, notifications, audit, linkCodes] as unknown as Array<Spec<unknown>>;
+const SPECS = [patients, therapists, courses, history, appointments, users, assignments, notifications, audit, linkCodes, linkRequests] as unknown as Array<Spec<unknown>>;
 
 /** Key order and undefined fields must not matter when deciding whether a row changed. */
 function canon(value: unknown): string {
@@ -172,7 +193,7 @@ function canon(value: unknown): string {
 }
 
 const EMPTY: AppData = {
-  patients: [], therapists: [], courses: [], appointments: [], notifications: [], courseAudit: [], users: [], linkCodes: [],
+  patients: [], therapists: [], courses: [], appointments: [], notifications: [], courseAudit: [], users: [], linkCodes: [], linkRequests: [], assignments: [],
   settings: undefined as unknown as NotificationSettings,
 };
 
@@ -207,6 +228,8 @@ async function readState(tx: SqlTx): Promise<{ data: AppData; initialized: boole
       courseAudit: await selectAll(tx, audit),
       users: await selectAll(tx, users),
       linkCodes: await selectAll(tx, linkCodes),
+      linkRequests: await selectAll(tx, linkRequests),
+      assignments: await selectAll(tx, assignments),
     },
   };
 }

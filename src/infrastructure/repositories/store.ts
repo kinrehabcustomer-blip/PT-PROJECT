@@ -61,6 +61,11 @@ const redisBackend: Backend = {
   clearAttempts: async (key) => void (await redis.redis("DEL", `pt:rl:${key}`)),
 };
 
+/** Documents saved before a collection existed (file / Redis) simply lack it. */
+function withDefaults(data: AppData): AppData {
+  return { ...data, linkRequests: data.linkRequests ?? [], assignments: data.assignments ?? [] };
+}
+
 let postgres: Backend | undefined;
 
 /** Postgres (Neon) wins when DATABASE_URL is set, then Redis, then local files. */
@@ -74,12 +79,12 @@ function backend(): Backend {
   return fileBackend;
 }
 
-export const loadData = (): Promise<AppData> => backend().loadData();
+export const loadData = async (): Promise<AppData> => withDefaults(await backend().loadData());
 export const findUser = (id: string) => backend().findUser(id);
 
 export const transact: Tx = (fn) =>
   backend().transact(async (current) => {
-    const out = await fn(current);
+    const out = await fn(withDefaults(current));
     return out.data ? { ...out, data: pruneOldNotifications(out.data) } : out;
   });
 

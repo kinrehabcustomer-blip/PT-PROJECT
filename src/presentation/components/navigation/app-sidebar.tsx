@@ -8,6 +8,7 @@ import { useApp } from "@/presentation/state/app-context";
 const navigation: ReadonlyArray<readonly [string, string, string, readonly Role[]]> = [
   ["▦", "นัดหมาย", "/", ["admin", "staff", "therapist"]],
   ["♙", "ผู้รับบริการ", "/patients", ["admin", "staff"]],
+  ["☍", "การดูแล", "/caseload", ["admin", "staff", "therapist"]],
   ["✚", "คอร์สการรักษา", "/courses", ["admin", "staff", "therapist"]],
   ["◷", "แจ้งเตือน", "/notifications", ["admin", "staff", "therapist"]],
   ["⚙", "ผู้ใช้และทีม", "/team", ["admin"]],
@@ -15,7 +16,8 @@ const navigation: ReadonlyArray<readonly [string, string, string, readonly Role[
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { role } = useApp();
+  const { role, data } = useApp();
+  const pending = data?.linkRequests.length ?? 0;
 
   return (
     <aside className="sidebar">
@@ -27,7 +29,7 @@ export function AppSidebar() {
       <nav className="nav-list" aria-label="เมนูหลัก">
         {navigation.filter(([, , , roles]) => roles.includes(role)).map(([icon, label, href]) => (
           <Link key={href} href={href} className={`nav-item ${pathname === href ? "active" : ""}`} aria-current={pathname === href ? "page" : undefined}>
-            <span className="nav-icon">{icon}</span><span className="nav-text">{label}</span>
+            <span className="nav-icon">{icon}</span><span className="nav-text">{label}{href === "/patients" && pending > 0 ? <span className="nav-badge" aria-label={`${pending} คำขอรอยืนยัน`}>{pending}</span> : null}</span>
           </Link>
         ))}
       </nav>

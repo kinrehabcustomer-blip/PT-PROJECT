@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { LinkTarget, Patient } from "@/domain/models";
 import { remainingSessions } from "@/domain/models";
+import { LinkRequestsPanel } from "@/presentation/components/line/link-requests-panel";
 import { useApp } from "@/presentation/state/app-context";
 
 export default function PatientsPage() {
@@ -10,22 +11,23 @@ export default function PatientsPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   if (!data) return null;
-  if (role === "therapist") return <div className="panel empty-state">หน้านี้สำหรับเจ้าหน้าที่และผู้ดูแลระบบ</div>;
+  if (role === "therapist") return <div className="panel empty-state">หน้านี้สำหรับเจ้าหน้าที่และผู้ดูแลระบบ ดูผู้ป่วยในความดูแลของคุณได้ที่เมนู &ldquo;การดูแล&rdquo;</div>;
 
-  const activeCode = (target: LinkTarget, id: string) =>
-    data.linkCodes.find((c) => c.target === target && c.targetId === id && new Date(c.expiresAt) > new Date());
-
-  const link = (target: LinkTarget, targetId: string, unlink = false) =>
-    act("POST", "/api/link-codes", { target, targetId, unlink }, unlink ? "ยกเลิกการผูก LINE แล้ว" : "สร้างรหัสผูก LINE แล้ว (หมดอายุใน 24 ชม.)");
+  const unlink = (target: LinkTarget, targetId: string) =>
+    act("POST", "/api/link-codes", { target, targetId, unlink: true }, "ยกเลิกการผูก LINE แล้ว");
 
   function LinkRow({ label, target, patient, lineId }: { label: string; target: LinkTarget; patient: Patient; lineId?: string }) {
-    const code = activeCode(target, patient.id);
+    const keyword = target === "relative" ? `ญาติ ${patient.name}` : patient.name;
+    const waiting = data!.linkRequests.filter((r) => r.target === target && r.targetId === patient.id).length;
     return (
       <div className="history-line">
-        <span>{label}: {lineId ? "ผูก LINE แล้ว" : "ยังไม่ผูก LINE"}{code && <> · ให้ส่งรหัส <strong className="code">{code.code}</strong> ไปที่ LINE Official Account</>}</span>
+        <span>
+          {label}: {lineId ? "ผูก LINE แล้ว" : "ยังไม่ผูก LINE"}
+          {!lineId && <> · ให้พิมพ์ส่ง LINE ของคลินิกว่า <strong className="code">{keyword}</strong></>}
+          {waiting > 0 && <> · <strong>มีคำขอรอยืนยัน {waiting} รายการ</strong> (ดูด้านบนของหน้านี้)</>}
+        </span>
         <span className="appointment-actions">
-          {!lineId && <button className="row-action" onClick={() => link(target, patient.id)}>สร้างรหัสผูก LINE</button>}
-          {lineId && <button className="row-action danger" onClick={() => window.confirm("ยกเลิกการผูก LINE?") && link(target, patient.id, true)}>ยกเลิกการผูก</button>}
+          {lineId && <button className="row-action danger" onClick={() => window.confirm("ยกเลิกการผูก LINE?") && unlink(target, patient.id)}>ยกเลิกการผูก</button>}
         </span>
       </div>
     );
@@ -53,6 +55,8 @@ export default function PatientsPage() {
         <button className="primary-button" onClick={() => setAdding(!adding)}>＋ &nbsp;เพิ่มผู้รับบริการ</button>
       </div>
 
+      <LinkRequestsPanel />
+
       {adding && (
         <section className="panel stack-pad" style={{ marginBottom: 16 }}>
           <form className="adjust-form" action={async (fd) => { if (await act("POST", "/api/patients", Object.fromEntries(fd), "เพิ่มผู้รับบริการแล้ว")) setAdding(false); }}>
@@ -72,7 +76,7 @@ export default function PatientsPage() {
             <section className="panel" key={p.id}>
               <button className="course-expand wide" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id}>
                 <div className="course-top"><span className="course-name">{p.name} · {p.phone}</span><span className="course-count">{courses.map((c) => `${remainingSessions(c)}/${c.totalSessions}`).join(" · ") || "ยังไม่มีคอร์ส"}</span></div>
-                <div className="ack-note">{p.condition || "ไม่ระบุอาการ"} · LINE: {p.lineUserId ? "ผูกแล้ว" : "ยังไม่ผูก"}</div>
+                <div className="ack-note">{p.condition || "ไม่ระบุอาการ"} · LINE: {p.lineUserId ? "ผูกแล้ว" : "ยังไม่ผูก"} · ดูแลโดย: {data.assignments.filter((a) => a.patientId === p.id).map((a) => data.therapists.find((t) => t.id === a.therapistId)?.name).filter(Boolean).join(", ") || "ยังไม่ระบุ"}</div>
               </button>
               {open === p.id && (
                 <div className="course-detail">

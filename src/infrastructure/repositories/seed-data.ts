@@ -133,6 +133,11 @@ export const seedData: AppData = {
   courseAudit: [],
   users: [],
   linkCodes: [],
+  linkRequests: [],
+  assignments: [
+    ["t-1", "p-1"], ["t-2", "p-2"], ["t-3", "p-3"], ["t-1", "p-4"], ["t-2", "p-5"], ["t-4", "p-6"],
+    ["t-5", "p-7"], ["t-4", "p-8"], ["t-5", "p-9"], ["t-3", "p-10"], ["t-2", "p-11"], ["t-1", "p-12"],
+  ].map(([therapistId, patientId]) => ({ id: `${therapistId}:${patientId}`, therapistId, patientId })),
   settings: {
     channel: "LINE",
     eveningTime: "18:00",

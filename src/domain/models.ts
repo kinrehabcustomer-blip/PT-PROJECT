@@ -37,6 +37,24 @@ export interface LinkCode {
   expiresAt: string;
 }
 
+/** A LINE user asked (by typing a name) to be linked; staff confirm before it takes effect. */
+export interface LinkRequest {
+  id: string;
+  target: LinkTarget;
+  targetId: string;
+  lineUserId: string;
+  /** The LINE display name, to help staff recognise who is asking. */
+  displayName?: string;
+  requestedAt: string;
+}
+
+/** A patient who is in a therapist's care (a patient can have several therapists). */
+export interface CareAssignment {
+  id: string;
+  therapistId: string;
+  patientId: string;
+}
+
 export interface Patient {
   id: string;
   name: string;
@@ -151,6 +169,8 @@ export interface AppData {
   settings: NotificationSettings;
   users: User[];
   linkCodes: LinkCode[];
+  linkRequests: LinkRequest[];
+  assignments: CareAssignment[];
 }
 
 export interface DashboardAppointment extends Appointment {

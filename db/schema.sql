@@ -137,6 +137,27 @@ CREATE TABLE IF NOT EXISTS settings (
   contact_phone    text NOT NULL DEFAULT ''
 );
 
+-- A LINE user typed a name to link their account; staff approve before it takes effect.
+CREATE TABLE IF NOT EXISTS link_requests (
+  id           text PRIMARY KEY,
+  target       text NOT NULL CHECK (target IN ('patient', 'relative', 'therapist')),
+  target_id    text NOT NULL,
+  line_user_id text NOT NULL,
+  display_name text,
+  requested_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS link_requests_line_idx ON link_requests (line_user_id);
+
+-- Which patients are in which therapist's care.
+CREATE TABLE IF NOT EXISTS therapist_patients (
+  seq bigserial UNIQUE,                       -- insertion order
+  id           text PRIMARY KEY,                     -- "<therapist_id>:<patient_id>"
+  therapist_id text NOT NULL REFERENCES therapists (id),
+  patient_id   text NOT NULL REFERENCES patients (id),
+  UNIQUE (therapist_id, patient_id)
+);
+CREATE INDEX IF NOT EXISTS therapist_patients_patient_idx ON therapist_patients (patient_id);
+
 -- Operational helpers (login throttle, single-run dispatch lock).
 CREATE TABLE IF NOT EXISTS rate_limits (
   key      text PRIMARY KEY,

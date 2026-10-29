@@ -204,3 +204,9 @@ button { font: inherit; }
 .check-field { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; font-size: 13px; }
 .check-field em { color: var(--muted); font-style: normal; }
 .form-field textarea { border: 1px solid #dfe7ea; border-radius: 7px; padding: 10px; font: inherit; color: var(--ink); resize: vertical; }
+
+/* Link requests, nav badge */
+.nav-badge { margin-left: 8px; background: #d9534f; color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+.request-panel { margin-bottom: 16px; border-color: #f0d9a8; background: #fffdf6; }
+.request-panel p { margin: 6px 0 10px; }
+.warn { color: #a8372d; font-style: normal; }

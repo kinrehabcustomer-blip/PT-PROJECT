@@ -18,6 +18,8 @@ export function NewAppointmentModal({
   );
 
   const [patientId, setPatientId] = useState(patientsWithCourses[0]?.id ?? "");
+  const caring = data.assignments.filter((a) => a.patientId === patientId).map((a) => a.therapistId);
+  const therapists = [...data.therapists].sort((a, b) => Number(caring.includes(b.id)) - Number(caring.includes(a.id)));
   const usableCourses = data.courses.filter((c) => c.patientId === patientId && remainingSessions(c) > 0);
 
   return (
@@ -27,7 +29,7 @@ export function NewAppointmentModal({
         {!patientsWithCourses.length && <p role="alert">ไม่มีผู้รับบริการที่มีคอร์สเหลือให้สร้างนัด</p>}
         <label className="form-field">ผู้รับบริการ<select name="patientId" required value={patientId} onChange={(e) => setPatientId(e.target.value)}>{patientsWithCourses.map((patient) => <option key={patient.id} value={patient.id}>{patient.name}</option>)}</select></label>
         <label className="form-field">คอร์สที่ใช้<select name="courseId" required>{usableCourses.map((c) => <option key={c.id} value={c.id}>{c.serviceName} (เหลือ {remainingSessions(c)}/{c.totalSessions})</option>)}</select></label>
-        <label className="form-field">นักกายภาพบำบัด<select name="therapistId" required>{data.therapists.map((therapist) => <option key={therapist.id} value={therapist.id}>{therapist.name}</option>)}</select></label>
+        <label className="form-field">นักกายภาพบำบัด<select name="therapistId" required key={patientId} defaultValue={caring[0]}>{therapists.map((therapist) => <option key={therapist.id} value={therapist.id}>{therapist.name}{caring.includes(therapist.id) ? " ★ ดูแลอยู่" : ""}</option>)}</select></label>
         <label className="form-field">วันที่นัด<input name="date" type="date" defaultValue={today} required /></label>
         <label className="form-field">เวลานัด<input name="time" type="time" defaultValue="10:00" required /></label>
         <label className="form-field">สถานที่<select name="location"><option>เข้ารับบริการที่บ้าน</option><option>คลินิก KIN สาขาบางนา</option></select></label>
