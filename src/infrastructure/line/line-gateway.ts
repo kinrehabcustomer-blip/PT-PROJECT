@@ -14,13 +14,22 @@ const REPLY_URL = "https://api.line.me/v2/bot/message/reply";
  * postback; reschedule opens LINE's date-time picker and sends the chosen time.
  * Both are handled in the webhook (application/line-responses.ts).
  */
-function appointmentCard(text: string, appointmentId: string) {
+function appointmentCard(text: string, appointmentId: string, audience?: "patient" | "therapist") {
   const id = encodeURIComponent(appointmentId);
+  const label = audience === "therapist" ? "สำหรับนักกายภาพ" : "สำหรับลูกค้า";
+  const color = audience === "therapist" ? "#1d4ed8" : "#15803d";
   return {
     type: "flex",
-    altText: text.slice(0, 400),
+    altText: `[${label}] ${text}`.slice(0, 400),
     contents: {
       type: "bubble",
+      header: {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: color,
+        paddingAll: "md",
+        contents: [{ type: "text", text: label, color: "#ffffff", weight: "bold", size: "md" }],
+      },
       body: { type: "box", layout: "vertical", contents: [{ type: "text", text: text.slice(0, 4000), wrap: true, size: "sm" }] },
       footer: {
         type: "box",
@@ -71,7 +80,7 @@ export const lineGateway: MessageGateway = {
         method: "POST",
         signal: AbortSignal.timeout(10_000),
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to, messages: [options?.appointmentId ? appointmentCard(text, options.appointmentId) : { type: "text", text: text.slice(0, 5000) }] }),
+        body: JSON.stringify({ to, messages: [options?.appointmentId ? appointmentCard(text, options.appointmentId, options.audience) : { type: "text", text: text.slice(0, 5000) }] }),
       });
       if (response.ok) return { status: "sent" };
       return { status: "failed", reason: `LINE ตอบกลับ ${response.status}` };

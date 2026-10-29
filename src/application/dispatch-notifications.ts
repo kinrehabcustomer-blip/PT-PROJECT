@@ -8,7 +8,11 @@ export type SendOutcome =
 /** Port for the outbound channel (LINE today). Implemented in infrastructure. */
 export interface MessageGateway {
   /** `appointmentId` asks the channel to add "confirm" and "reschedule" buttons to the message. */
-  send(recipientLineId: string, text: string, options?: { appointmentId?: string }): Promise<SendOutcome>;
+  send(
+    recipientLineId: string,
+    text: string,
+    options?: { appointmentId?: string; audience?: "patient" | "therapist" },
+  ): Promise<SendOutcome>;
   reply?(replyToken: string, text: string): Promise<void>;
   /** The LINE display name of a user, to help staff recognise who asked to be linked. */
   displayName?(lineUserId: string): Promise<string | undefined>;
@@ -72,7 +76,10 @@ export async function dispatchDueNotifications(
     const delivered = new Set(n.deliveredTo ?? []);
     const pending = recipients.filter((to) => !delivered.has(to));
     // Messages about a booking carry the confirm/reschedule buttons (not cancellations or admin alerts).
-    const options = n.appointmentId && n.audience !== "admin" && TIMED_KINDS.has(n.kind) ? { appointmentId: n.appointmentId } : undefined;
+    const options =
+      n.appointmentId && n.audience !== "admin" && TIMED_KINDS.has(n.kind)
+        ? { appointmentId: n.appointmentId, audience: n.audience }
+        : undefined;
     const outcomes = await Promise.all(pending.map(async (to) => ({ to, outcome: await gateway.send(to, n.message, options) })));
     for (const { to, outcome } of outcomes) if (outcome.status === "sent") delivered.add(to);
 
