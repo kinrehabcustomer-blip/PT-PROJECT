@@ -93,3 +93,27 @@ export async function dispatchDueNotifications(
   }
   return { ...data, notifications };
 }
+
+/**
+ * Applies the outcome of a dispatch run (computed from `snapshot`) onto the
+ * current stored data. Sending takes a while, so users may have changed things
+ * meanwhile; only notifications untouched since the snapshot take the new
+ * status, and anything else is left exactly as the user last saved it.
+ */
+export function mergeDispatchResult(fresh: AppData, snapshot: AppData, sent: AppData): AppData {
+  const before = new Map(snapshot.notifications.map((n) => [n.id, JSON.stringify(n)]));
+  const after = new Map(sent.notifications.map((n) => [n.id, n]));
+  const freshIds = new Set(fresh.notifications.map((n) => n.id));
+  const freshKeys = new Set(fresh.notifications.map((n) => n.dedupeKey));
+
+  const merged = fresh.notifications.map((n) => {
+    const next = after.get(n.id);
+    const original = before.get(n.id);
+    return next && original !== undefined && JSON.stringify(n) === original ? next : n;
+  });
+  // Course alerts raised by this run that nobody else created in the meantime.
+  for (const n of sent.notifications) {
+    if (!before.has(n.id) && !freshIds.has(n.id) && !freshKeys.has(n.dedupeKey)) merged.push(n);
+  }
+  return { ...fresh, notifications: merged };
+}

@@ -1,22 +1,31 @@
 import { NextResponse } from "next/server";
+import { dispatchDueNotifications, mergeDispatchResult } from "@/application/dispatch-notifications";
 import { syncCourseAlerts } from "@/application/notification-planner";
-import { guard } from "@/app/api/_lib/respond";
-import { dispatchDueNotifications } from "@/application/dispatch-notifications";
 import { lineGateway } from "@/infrastructure/line/line-gateway";
-import { transact } from "@/infrastructure/repositories/file-repository";
+import { loadData, transact, tryLock } from "@/infrastructure/repositories/store";
+import { guard } from "@/app/api/_lib/respond";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 async function dispatch() {
-  const summary = await transact(async (data) => {
-    const next = await dispatchDueNotifications(syncCourseAlerts(data, new Date()), lineGateway);
-    const count = (status: string) => next.notifications.filter((n) => n.status === status).length;
-    return {
-      result: { ok: true as const, sent: count("sent"), skipped: count("skipped"), failed: count("failed"), queued: count("queued") },
-      data: next,
-    };
+  // One run at a time across all server instances, or people could get a message twice.
+  const run = await tryLock("dispatch", 55, async () => {
+    const now = new Date();
+    const snapshot = await loadData();
+    const sent = await dispatchDueNotifications(syncCourseAlerts(snapshot, now), lineGateway, now);
+    // Sending is slow; merge into whatever is stored now instead of overwriting it.
+    return transact((fresh) => {
+      const merged = mergeDispatchResult(fresh, snapshot, sent);
+      const count = (status: string) => merged.notifications.filter((n) => n.status === status).length;
+      return {
+        result: { ok: true as const, sent: count("sent"), skipped: count("skipped"), failed: count("failed"), queued: count("queued") },
+        data: merged,
+      };
+    });
   });
-  return NextResponse.json(summary);
+  if (!run.ran) return NextResponse.json({ message: "กำลังส่งอยู่ กรุณารอสักครู่" }, { status: 409 });
+  return NextResponse.json(run.value);
 }
 
 /** Cron entry point. Requires `Authorization: Bearer $CRON_SECRET`. */

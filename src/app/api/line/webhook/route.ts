@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { redeemLinkCode } from "@/application/directory-use-cases";
 import { verifyLineSignature } from "@/infrastructure/auth/crypto";
 import { lineGateway } from "@/infrastructure/line/line-gateway";
-import { transact } from "@/infrastructure/repositories/file-repository";
+import { transact } from "@/infrastructure/repositories/store";
 
 interface LineEvent {
   type: string;

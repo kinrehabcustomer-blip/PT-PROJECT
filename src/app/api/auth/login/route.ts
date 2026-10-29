@@ -1,25 +1,10 @@
 import { NextResponse } from "next/server";
 import type { User } from "@/domain/models";
 import { hashPassword, verifyPassword } from "@/infrastructure/auth/crypto";
-import { getPasswordHash, setPasswordHash } from "@/infrastructure/auth/credentials";
+import { credentialStore } from "@/infrastructure/repositories/store";
 import { startSession } from "@/infrastructure/auth/session";
-import { transact } from "@/infrastructure/repositories/file-repository";
+import { clearAttempts, tooManyAttempts, transact } from "@/infrastructure/repositories/store";
 import { readBody } from "@/app/api/_lib/respond";
-
-// Per-process throttle: 5 failures per username per 15 minutes.
-const failures = new Map<string, { count: number; first: number }>();
-const WINDOW = 15 * 60_000;
-
-function throttled(key: string): boolean {
-  const f = failures.get(key);
-  if (!f || Date.now() - f.first > WINDOW) return false;
-  return f.count >= 5;
-}
-function recordFailure(key: string) {
-  const f = failures.get(key);
-  if (!f || Date.now() - f.first > WINDOW) failures.set(key, { count: 1, first: Date.now() });
-  else f.count += 1;
-}
 
 export async function POST(request: Request) {
   if (!(request.headers.get("content-type") ?? "").includes("application/json")) {
@@ -28,12 +13,10 @@ export async function POST(request: Request) {
   const body = await readBody(request);
   const username = String(body.username ?? "").trim().toLowerCase();
   const password = String(body.password ?? "");
-  const fail = () => {
-    recordFailure(username);
-    return NextResponse.json({ message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }, { status: 401 });
-  };
+  const fail = () => NextResponse.json({ message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }, { status: 401 });
   if (!username || !password) return fail();
-  if (throttled(username)) {
+  // Counts every attempt (5 per 15 minutes per username), shared across server instances.
+  if (await tooManyAttempts(`login:${username}`, 5, 15 * 60)) {
     return NextResponse.json({ message: "ลองเข้าสู่ระบบผิดหลายครั้ง กรุณารอ 15 นาที" }, { status: 429 });
   }
 
@@ -48,15 +31,16 @@ export async function POST(request: Request) {
       result: { ok: true as const },
       data: data.users.length ? undefined : { ...data, users: [admin] },
     }));
-    await setPasswordHash(admin.id, hashPassword(bootstrap));
+    await credentialStore.set(admin.id, hashPassword(bootstrap));
+    await clearAttempts(`login:${username}`);
     await startSession(admin.id);
     return NextResponse.json({ user: admin });
   }
 
   const user = users.find((u) => u.username === username && u.active);
-  const hash = user ? await getPasswordHash(user.id) : undefined;
+  const hash = user ? await credentialStore.get(user.id) : undefined;
   if (!user || !hash || !verifyPassword(password, hash)) return fail();
-  failures.delete(username);
+  await clearAttempts(`login:${username}`);
   await startSession(user.id);
   return NextResponse.json({ user });
 }

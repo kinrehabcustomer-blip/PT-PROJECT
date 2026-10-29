@@ -3,9 +3,9 @@ import type { Role } from "@/domain/models";
 import { createUser } from "@/application/directory-use-cases";
 import { viewFor } from "@/application/data-view";
 import { hashPassword } from "@/infrastructure/auth/crypto";
-import { setPasswordHash } from "@/infrastructure/auth/credentials";
+import { credentialStore } from "@/infrastructure/repositories/store";
 import { toActor } from "@/infrastructure/auth/session";
-import { transact } from "@/infrastructure/repositories/file-repository";
+import { transact } from "@/infrastructure/repositories/store";
 import { guard, readBody } from "@/app/api/_lib/respond";
 
 export async function POST(request: Request) {
@@ -31,6 +31,6 @@ export async function POST(request: Request) {
   });
   if (!outcome.ok) return NextResponse.json({ message: outcome.message }, { status: 422 });
   if (!outcome.user) return NextResponse.json({ message: "สร้างผู้ใช้ไม่สำเร็จ" }, { status: 500 });
-  await setPasswordHash(outcome.user.id, hashPassword(password));
+  await credentialStore.set(outcome.user.id, hashPassword(password));
   return NextResponse.json(viewFor(admin, outcome.data));
 }

@@ -42,3 +42,17 @@ export function transact<T extends { ok: boolean }>(
   queue = run.catch(() => undefined);
   return run;
 }
+
+export { getPasswordHash as getHash, setPasswordHash as setHash } from "@/infrastructure/auth/credentials";
+
+let locked = false;
+/** Single-process lock; enough for one always-on server. */
+export async function tryLock<T>(_name: string, _ttlSeconds: number, fn: () => Promise<T>): Promise<{ ran: true; value: T } | { ran: false }> {
+  if (locked) return { ran: false };
+  locked = true;
+  try {
+    return { ran: true, value: await fn() };
+  } finally {
+    locked = false;
+  }
+}

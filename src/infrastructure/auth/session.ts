@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import type { Actor, User } from "@/domain/models";
-import { loadData } from "@/infrastructure/repositories/file-repository";
+import { loadData } from "@/infrastructure/repositories/store";
 import { signToken, verifyToken } from "@/infrastructure/auth/crypto";
 
 export const SESSION_COOKIE = "pt_session";

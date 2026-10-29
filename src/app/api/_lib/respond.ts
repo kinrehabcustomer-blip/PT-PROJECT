@@ -3,7 +3,7 @@ import type { Actor, AppData, Role, User } from "@/domain/models";
 import type { AppointmentActionResult } from "@/application/appointment-use-cases";
 import { viewFor } from "@/application/data-view";
 import { currentUser, toActor } from "@/infrastructure/auth/session";
-import { transact } from "@/infrastructure/repositories/file-repository";
+import { transact } from "@/infrastructure/repositories/store";
 
 export interface RequestContext {
   actor: Actor;

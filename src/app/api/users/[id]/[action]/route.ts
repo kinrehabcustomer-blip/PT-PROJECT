@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { setUserActive } from "@/application/directory-use-cases";
 import { viewFor } from "@/application/data-view";
 import { hashPassword } from "@/infrastructure/auth/crypto";
-import { setPasswordHash } from "@/infrastructure/auth/credentials";
-import { loadData } from "@/infrastructure/repositories/file-repository";
+import { credentialStore } from "@/infrastructure/repositories/store";
+import { loadData } from "@/infrastructure/repositories/store";
 import { guard, readBody, runAction } from "@/app/api/_lib/respond";
 
 type Params = { params: Promise<{ id: string; action: string }> };
@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: Params) {
     }
     const data = await loadData();
     if (!data.users.some((u) => u.id === id)) return NextResponse.json({ message: "ไม่พบผู้ใช้งาน" }, { status: 404 });
-    await setPasswordHash(id, hashPassword(password));
+    await credentialStore.set(id, hashPassword(password));
     return NextResponse.json(viewFor(admin, data));
   }
   if (action === "enable" || action === "disable") {
