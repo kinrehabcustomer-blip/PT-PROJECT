@@ -1,0 +1,29 @@
+{
+  "name": "pt-care-operations",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "line:check": "tsx scripts/line-check.ts"
+  },
+  "dependencies": {
+    "next": "16.4.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.7",
+    "eslint": "^9.30.0",
+    "eslint-config-next": "16.4.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
