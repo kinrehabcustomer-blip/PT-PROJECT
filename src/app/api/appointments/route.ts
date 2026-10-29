@@ -17,5 +17,6 @@ export async function POST(request: Request) {
       },
       ctx,
     ),
+    ["admin", "staff"],
   );
 }

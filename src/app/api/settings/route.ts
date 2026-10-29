@@ -26,5 +26,5 @@ export async function PUT(request: Request) {
       contactPhone,
     };
     return { ok: true, data: { ...data, settings } };
-  });
+  }, ["admin"]);
 }

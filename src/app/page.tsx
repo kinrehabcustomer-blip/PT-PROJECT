@@ -40,6 +40,13 @@ export default function DashboardPage() {
       .sort((a, b) => a.time.localeCompare(b.time));
   }, [data, filter, day]);
 
+  const lineByAppointment = useMemo(() => {
+    const map = new Map<string, { patient: ReturnType<typeof lineStatus>; therapist: ReturnType<typeof lineStatus> }>();
+    if (!data) return map;
+    for (const a of appointments) map.set(a.id, { patient: lineStatus(data, a.id, "patient"), therapist: lineStatus(data, a.id, "therapist") });
+    return map;
+  }, [data, appointments]);
+
   if (!data) return null;
 
   const post = async (id: string, action: string, success: string, body: Record<string, unknown> = {}) => {
@@ -143,8 +150,8 @@ export default function DashboardPage() {
                 role={role}
                 busy={busyId !== null}
                 line={{
-                  patient: role === "therapist" ? undefined : lineStatus(data, appointment.id, "patient"),
-                  therapist: lineStatus(data, appointment.id, "therapist"),
+                  patient: role === "therapist" ? undefined : lineByAppointment.get(appointment.id)?.patient,
+                  therapist: lineByAppointment.get(appointment.id)?.therapist,
                 }}
                 onRemind={() => setReminding(appointment)}
                 onAcknowledge={() => post(appointment.id, "acknowledge", "ยืนยันรับทราบนัดหมายแล้ว")}

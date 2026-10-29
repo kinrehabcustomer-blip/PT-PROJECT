@@ -68,6 +68,12 @@ export function createAppointment(
     return { ok: false, message: "วันหรือเวลานัดไม่ถูกต้อง" };
   }
   if (!input.address.trim()) return { ok: false, message: "กรุณาระบุที่อยู่ที่ใช้เข้ารับบริการ" };
+  if (input.address.length > 300 || input.location.length > 100) return { ok: false, message: "ที่อยู่หรือสถานที่ยาวเกินไป" };
+  const mapUrl = input.mapUrl?.trim();
+  // Only web links: the therapist is sent this text and may tap it.
+  if (mapUrl && (mapUrl.length > 500 || !/^https?:\/\/[^\s]+$/i.test(mapUrl))) {
+    return { ok: false, message: "ลิงก์แผนที่ต้องขึ้นต้นด้วย http:// หรือ https:// และไม่มีช่องว่าง" };
+  }
 
   // A session already held by an open appointment is not available for a new booking.
   const held = (courseId: string) =>
@@ -95,7 +101,7 @@ export function createAppointment(
     serviceName: course.serviceName,
     location: input.location,
     address: input.address.trim(),
-    mapUrl: input.mapUrl?.trim() || undefined,
+    mapUrl: mapUrl || undefined,
     status: "รอยืนยัน",
     acknowledged: false,
   };

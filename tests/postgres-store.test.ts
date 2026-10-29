@@ -129,6 +129,7 @@ test("course adjustments, users and settings persist", async () => {
   assert.equal(d.settings.eveningTime, "19:30");
   const user = d.users[0];
   assert.deepEqual(await repo.findUser(user.id), user);
+  assert.deepEqual((await repo.listUsers()).map((u) => u.username), d.users.map((u) => u.username), "plain users read, in creation order");
   assert.equal(await repo.findUser("nope"), undefined);
 });
 

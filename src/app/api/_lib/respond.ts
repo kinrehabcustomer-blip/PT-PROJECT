@@ -3,6 +3,7 @@ import type { Actor, AppData, Role, User } from "@/domain/models";
 import type { AppointmentActionResult } from "@/application/appointment-use-cases";
 import { viewFor } from "@/application/data-view";
 import { currentUser, toActor } from "@/infrastructure/auth/session";
+import { audit, clientIp } from "@/infrastructure/audit-log";
 import { transact } from "@/infrastructure/repositories/store";
 
 export interface RequestContext {
@@ -50,7 +51,11 @@ export async function runAction(
     const result = await action(data, body, ctx);
     return { result, data: result.ok ? result.data : undefined };
   });
-  return outcome.ok
-    ? NextResponse.json(viewFor(user, outcome.data))
-    : NextResponse.json({ message: outcome.message }, { status: 422 });
+  const path = new URL(request.url).pathname;
+  if (!outcome.ok) {
+    audit("action_rejected", { path, actor: user.username, role: user.role, reason: outcome.message.slice(0, 80) });
+    return NextResponse.json({ message: outcome.message }, { status: 422 });
+  }
+  audit("action", { method: request.method, path, actor: user.username, role: user.role, ip: clientIp(request) });
+  return NextResponse.json(viewFor(user, outcome.data));
 }

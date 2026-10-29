@@ -19,10 +19,12 @@ export async function POST(request: Request, { params }: Params) {
           },
           ctx,
         ),
+        ["admin"],
       );
     case "void-history":
       return runAction(request, (data, body, ctx) =>
         voidHistoryEntry(data, id, String(body.historyId ?? ""), String(body.reason ?? ""), ctx),
+        ["admin"],
       );
     default:
       return NextResponse.json({ message: "ไม่รู้จักการดำเนินการนี้" }, { status: 404 });

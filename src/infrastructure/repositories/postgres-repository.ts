@@ -202,7 +202,10 @@ const EMPTY: AppData = {
  * The app often runs far from the database, so the number of round trips
  * dominates the response time.
  */
-function loadAllSql(): string {
+const loadAllSql = (): string => (cachedLoadAllSql ??= buildLoadAllSql());
+let cachedLoadAllSql: string | undefined;
+
+function buildLoadAllSql(): string {
   const parts = (SPECS as Array<Spec<unknown>>).map(
     (spec) => `'${spec.table}', (SELECT coalesce(json_agg(t ORDER BY ${spec.orderBy}), '[]'::json) FROM ${spec.table} t)`,
   );
@@ -307,6 +310,11 @@ export function createPostgresRepository(db: SqlDb) {
         if (data) await writeDiff(tx, initialized ? current : EMPTY, data);
         return result;
       });
+    },
+
+    async listUsers(): Promise<User[]> {
+      const { rows } = await db.query("SELECT * FROM users ORDER BY seq");
+      return rows.map((r) => users.fromRow(r as Row));
     },
 
     async findUser(id: string): Promise<User | undefined> {

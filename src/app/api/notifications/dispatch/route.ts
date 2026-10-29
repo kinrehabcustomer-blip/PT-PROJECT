@@ -3,6 +3,7 @@ import { dispatchDueNotifications, mergeDispatchResult } from "@/application/dis
 import { syncCourseAlerts } from "@/application/notification-planner";
 import { lineGateway } from "@/infrastructure/line/line-gateway";
 import { loadData, transact, tryLock } from "@/infrastructure/repositories/store";
+import { safeEqual } from "@/infrastructure/auth/crypto";
 import { guard } from "@/app/api/_lib/respond";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   // Trim: a pasted secret often carries a trailing newline or space.
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) return NextResponse.json({ message: "CRON_SECRET not set" }, { status: 503 });
-  if (request.headers.get("authorization")?.trim() !== `Bearer ${secret}`) {
+  if (!safeEqual(request.headers.get("authorization")?.trim() ?? "", `Bearer ${secret}`)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   return dispatch();

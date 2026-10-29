@@ -26,7 +26,7 @@ export function adjustCourse(
   if (usedSessions > totalSessions) {
     return { ok: false, message: "จำนวนครั้งที่ใช้ไปต้องไม่เกินจำนวนครั้งทั้งหมด" };
   }
-  if (!change.reason.trim()) return { ok: false, message: "กรุณาระบุเหตุผลในการแก้ไข" };
+  if (!change.reason.trim() || change.reason.length > 300) return { ok: false, message: "กรุณาระบุเหตุผลในการแก้ไข (ไม่เกิน 300 ตัวอักษร)" };
   if (totalSessions === course.totalSessions && usedSessions === course.usedSessions) {
     return { ok: false, message: "ไม่มีการเปลี่ยนแปลงข้อมูล" };
   }

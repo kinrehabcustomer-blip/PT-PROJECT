@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { viewFor } from "../src/application/data-view";
+import { hashPassword, hashPasswordAsync, verifyPassword, verifyPasswordAsync } from "../src/infrastructure/auth/crypto";
 import { assignPatient, unassignPatient } from "../src/application/directory-use-cases";
 import { createAppointment } from "../src/application/appointment-use-cases";
 import {
@@ -182,4 +183,12 @@ test("the browser gets recent notifications and anything tied to an open appoint
   };
   const ids = recentNotifications(data, new Date("2026-10-29T00:00:00Z")).map((n) => n.id).sort();
   assert.deepEqual(ids, ["old-open", "old-queued", "recent"]);
+});
+
+test("async password hashing is interchangeable with the sync version", async () => {
+  const fromAsync = await hashPasswordAsync("correct horse battery");
+  assert.equal(verifyPassword("correct horse battery", fromAsync), true);
+  assert.equal(await verifyPasswordAsync("correct horse battery", hashPassword("correct horse battery")), true);
+  assert.equal(await verifyPasswordAsync("wrong", fromAsync), false);
+  assert.equal(await verifyPasswordAsync("x", "not-a-hash"), false);
 });

@@ -1,7 +1,6 @@
 import type { AppData, User } from "@/domain/models";
 import { pruneOldNotifications } from "@/application/retention";
 import * as file from "@/infrastructure/repositories/file-repository";
-import * as redis from "@/infrastructure/repositories/redis-repository";
 import { createPostgresRepository } from "@/infrastructure/repositories/postgres-repository";
 import { createPgDb, databaseUrl } from "@/infrastructure/repositories/pg-client";
 
@@ -14,6 +13,7 @@ interface Backend {
   loadData(): Promise<AppData>;
   transact: Tx;
   findUser(id: string): Promise<User | undefined>;
+  listUsers(): Promise<User[]>;
   getHash(userId: string): Promise<string | undefined>;
   setHash(userId: string, hash: string): Promise<void>;
   tryLock: Lock;
@@ -37,6 +37,7 @@ const fileBackend: Backend = {
   loadData: file.loadData,
   transact: file.transact,
   findUser: async (id) => (await file.loadData()).users.find((u) => u.id === id),
+  listUsers: async () => (await file.loadData()).users,
   getHash: file.getHash,
   setHash: file.setHash,
   tryLock: file.tryLock,
@@ -44,35 +45,17 @@ const fileBackend: Backend = {
   clearAttempts: async (key) => void localHits.delete(key),
 };
 
-// --- Upstash Redis (single JSON document) --------------------------------------------------
-const redisBackend: Backend = {
-  loadData: redis.loadData,
-  transact: redis.transact,
-  findUser: async (id) => (await redis.loadData()).users.find((u) => u.id === id),
-  getHash: redis.getHash,
-  setHash: redis.setHash,
-  tryLock: redis.tryLock,
-  async tooManyAttempts(key, max, windowSeconds) {
-    const k = `pt:rl:${key}`;
-    const count = await redis.redis<number>("INCR", k);
-    if (count === 1) await redis.redis("EXPIRE", k, windowSeconds);
-    return count > max;
-  },
-  clearAttempts: async (key) => void (await redis.redis("DEL", `pt:rl:${key}`)),
-};
-
-/** Documents saved before a collection existed (file / Redis) simply lack it. */
+/** Documents saved before a collection existed (local file) simply lack it. */
 function withDefaults(data: AppData): AppData {
   return { ...data, linkRequests: data.linkRequests ?? [], assignments: data.assignments ?? [] };
 }
 
 let postgres: Backend | undefined;
 
-/** Postgres (Neon) wins when DATABASE_URL is set, then Redis, then local files. */
+/** Postgres (Neon) when DATABASE_URL is set; otherwise local JSON files (development or one always-on server). */
 function backend(): Backend {
   const url = databaseUrl();
   if (url) return (postgres ??= createPostgresRepository(createPgDb(url)));
-  if (redis.redisConfigured()) return redisBackend;
   if (process.env.VERCEL) {
     throw new Error("ยังไม่ได้ตั้งค่าที่เก็บข้อมูล: Vercel เขียนไฟล์ไม่ได้ กรุณาตั้งค่า DATABASE_URL (Neon Postgres)");
   }
@@ -81,6 +64,7 @@ function backend(): Backend {
 
 export const loadData = async (): Promise<AppData> => withDefaults(await backend().loadData());
 export const findUser = (id: string) => backend().findUser(id);
+export const listUsers = () => backend().listUsers();
 
 export const transact: Tx = (fn) =>
   backend().transact(async (current) => {

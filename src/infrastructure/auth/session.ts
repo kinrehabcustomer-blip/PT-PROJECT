@@ -3,7 +3,8 @@ import type { Actor, User } from "@/domain/models";
 import { findUser } from "@/infrastructure/repositories/store";
 import { signToken, verifyToken } from "@/infrastructure/auth/crypto";
 
-export const SESSION_COOKIE = "pt_session";
+// The __Host- prefix makes browsers insist on Secure + path=/ + no Domain, so the cookie cannot be planted from a subdomain.
+export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-pt_session" : "pt_session";
 const SESSION_MS = 12 * 3_600_000;
 
 export async function startSession(userId: string): Promise<void> {
@@ -19,6 +20,12 @@ export async function startSession(userId: string): Promise<void> {
 
 export async function endSession(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
+}
+
+/** The user id in a valid session cookie (no database access), or null. */
+export async function sessionUserId(): Promise<string | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return (token ? verifyToken(token) : null)?.uid ?? null;
 }
 
 /** The signed-in, still-active user, or null. Re-read on every request so disabling takes effect at once. */

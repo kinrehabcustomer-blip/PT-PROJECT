@@ -36,6 +36,7 @@ export interface PatientInput {
 
 function validatePatient(input: PatientInput): string | null {
   if (!input.name.trim()) return "กรุณาระบุชื่อผู้รับบริการ";
+  if (input.name.length > 120 || input.condition.length > 500) return "ชื่อหรืออาการยาวเกินไป";
   if (!/^[0-9+\-\s]{8,20}$/.test(input.phone.trim())) return "เบอร์โทรไม่ถูกต้อง";
   if (input.reminder?.leadHours !== undefined && ![0, 1, 2].includes(input.reminder.leadHours)) {
     return "ต้องเลือกเตือนก่อนนัด 0, 1 หรือ 2 ชั่วโมง";
@@ -112,6 +113,7 @@ export function createTherapist(
   if (ctx.actor?.role !== "admin") return { ok: false, message: DENIED_ADMIN };
   const name = input.name.trim();
   if (!name) return { ok: false, message: "กรุณาระบุชื่อนักกายภาพบำบัด" };
+  if (name.length > 80) return { ok: false, message: "ชื่อยาวเกินไป" };
   if (!/^[0-9+\-\s]{8,20}$/.test(input.phone.trim())) return { ok: false, message: "เบอร์โทรไม่ถูกต้อง" };
   const therapist: Therapist = {
     id: newId("t"),
@@ -133,7 +135,7 @@ export function createUser(
   if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
     return { ok: false, message: "ชื่อผู้ใช้ต้องเป็นอักษรอังกฤษ/ตัวเลข 3–32 ตัว" };
   }
-  if (!input.name.trim()) return { ok: false, message: "กรุณาระบุชื่อ" };
+  if (!input.name.trim() || input.name.length > 80) return { ok: false, message: "กรุณาระบุชื่อ (ไม่เกิน 80 ตัวอักษร)" };
   if (!["admin", "staff", "therapist"].includes(input.role)) return { ok: false, message: "บทบาทไม่ถูกต้อง" };
   if (data.users.some((u) => u.username === username)) return { ok: false, message: "ชื่อผู้ใช้นี้ถูกใช้แล้ว" };
   if (input.role === "therapist") {
