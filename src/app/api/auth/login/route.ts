@@ -7,6 +7,19 @@ import { clearAttempts, tooManyAttempts, transact } from "@/infrastructure/repos
 import { readBody } from "@/app/api/_lib/respond";
 
 export async function POST(request: Request) {
+  try {
+    return await handleLogin(request);
+  } catch (error) {
+    // Surface configuration problems (e.g. missing AUTH_SECRET) instead of an empty 500.
+    console.error("Login failed", error);
+    const message = error instanceof Error && error.message.includes("AUTH_SECRET")
+      ? "เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า AUTH_SECRET (ต้องยาวอย่างน้อย 16 ตัวอักษร)"
+      : "ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแล";
+    return NextResponse.json({ message }, { status: 500 });
+  }
+}
+
+async function handleLogin(request: Request) {
   if (!(request.headers.get("content-type") ?? "").includes("application/json")) {
     return NextResponse.json({ message: "ต้องส่งข้อมูลเป็น JSON" }, { status: 415 });
   }
