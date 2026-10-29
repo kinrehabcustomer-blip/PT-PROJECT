@@ -8,7 +8,9 @@ export function databaseUrl(): string | undefined {
 const globalForPool = globalThis as unknown as { __ptPool?: Pool };
 
 /** Shared pool. Kept small: serverless instances each open their own, and Neon's pooler fans them in. */
-export function createPgDb(connectionString: string): SqlDb {
+export function createPgDb(rawConnectionString: string): SqlDb {
+  // pg already treats these modes as verify-full; saying so silences its deprecation warning without changing behaviour.
+  const connectionString = rawConnectionString.replace(/sslmode=(require|prefer|verify-ca)(?=&|$)/, "sslmode=verify-full");
   const pool = (globalForPool.__ptPool ??= new Pool({
     connectionString,
     max: 3,
